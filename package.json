@@ -1,0 +1,18 @@
+{
+  "name": "javascript-ogm-exploration",
+  "version": "0.0.1-alpha01",
+  "description": "Exploring the possibility of a javascript OGM for Neo4j",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Max Åke Gustafsson",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "neo4j-driver": "^5.28.1"
+  }
+}
