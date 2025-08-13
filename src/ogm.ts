@@ -1,10 +1,9 @@
 import * as neo4j from "neo4j-driver";
 import { NodeRepository } from "./repository.js";
-import type { NumberAnnotation, StringAnnotation } from "./typeAnnotation.js";
+import type { SchemaAnnotation } from "./typeAnnotation.js";
 import { hydratedResultTransformer } from "./mapping/resulttransformer.js";
 import type { Rules } from "./mapping/mapping.js";
 
-export type SchemaAnnotation = NumberAnnotation | StringAnnotation;
 
 export type OGMSchema = Record<string, SchemaAnnotation>;
 
