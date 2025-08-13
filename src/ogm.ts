@@ -1,6 +1,8 @@
 import * as neo4j from "neo4j-driver";
 import { NodeRepository } from "./repository.js";
 import type { NumberAnnotation, StringAnnotation } from "./typeAnnotation.js";
+import { hydratedResultTransformer } from "./mapping/resulttransformer.js";
+import type { Rules } from "./mapping/mapping.js";
 
 export type SchemaAnnotation = NumberAnnotation | StringAnnotation;
 
@@ -20,13 +22,9 @@ export class OGM {
     // Max add resultsMapper here
     public async runCypher<T extends Record<string, any>>(
         cypher: string,
-        params: Record<string, any> = {}
+        params: Record<string, any> = {},
+        rules: Rules,
     ): Promise<T[]> {
-        const rawResults = await this.driver.executeQuery(cypher, params);
-
-        return rawResults.records.map((r) => {
-            const rawObject = r.toObject();
-            return rawObject;
-        });
+        return this.driver.executeQuery<T[]>(cypher, params, {resultTransformer: hydratedResultTransformer<T[]>(rules)});
     }
 }
