@@ -1,19 +1,21 @@
 import * as neo4j from "neo4j-driver";
 import { OGM } from "./src/ogm.js";
-import { OGMNumber, OGMString, OGMRelationship } from "./src/typeAnnotation.js";
+import { OGMNumber, OGMRelationship, OGMString } from "./src/typeAnnotation.js";
 
 const PersonSchema = {
     name: OGMString,
-    born: OGMNumber
-}
+    born: OGMNumber,
+};
 
 const MovieSchema = {
     title: OGMString,
-    release: OGMNumber,
-    actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN")
+    released: OGMNumber,
+    actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN"),
 };
 
-const driver = neo4j.driver("neo4j://localhost:7687", neo4j.auth.basic("neo4j", "password"), {disableLosslessIntegers: true});
+const driver = neo4j.driver("neo4j://localhost:7687", neo4j.auth.basic("neo4j", "password"), {
+    disableLosslessIntegers: true,
+});
 
 const ogm = new OGM(driver);
 
@@ -24,5 +26,10 @@ const movies = await movieRepository.find({
 });
 
 console.log(movies);
+
+await movieRepository.create({
+    title: "The Fountain",
+    released: 1999,
+});
 
 driver.close();
