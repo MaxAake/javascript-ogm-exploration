@@ -21,6 +21,9 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         const movieNode = new Cypher.Node();
 
         const parsedPredicates = Object.entries(where).reduce((acc, [key, value]) => {
+            if(this.rules[key]?.validate !==undefined) {
+                this.rules[key].validate(value, key)
+            }
             acc[key] = new Cypher.Param(value);
             return acc;
         }, {} as Record<string, Cypher.Param>);
