@@ -34,4 +34,15 @@ const movie = await movieRepository.create({
 
 console.log(movie);
 
+const updatedMovie = await movieRepository.update(
+    {
+        title: "The Fountain",
+    },
+    {
+        released: 1000,
+    }
+);
+
+console.log(updatedMovie);
+
 driver.close();
