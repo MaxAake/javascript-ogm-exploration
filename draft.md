@@ -1,6 +1,17 @@
-import { driver } from "neo4j-driver"
+TODO:
+
+-   Return items on create <- Andres
+-   Update operation with where and values <- Andres
+-   If possible, update using ID over DAOs <- Andres
+
+-   Eager relationship (1-level) <- Max
+-   Relationships in find (with where if possible) <- Max
+
+```ts
+import { driver, Relationship } from "neo4j-driver"
 import { OGMString, OGMNumber, OGMRelationship } from "./src/typeAnnotation.js"
 import { gt } from "@neo4j/cypher-builder"
+import type { OGM } from "./src/ogm.js"
 
 
 // Second Draft
@@ -158,3 +169,145 @@ moviesRepository.find(where: {
         }
     }, 2)
 })
+
+
+
+
+
+// Option 1:
+
+const movie=await movieRepository.create({title: "The Matrix"})
+
+
+// Option 2:
+
+const movie=new Movie() // movieRepository.instance({title: "The Matrix"})
+
+movie.title="The Matrix"
+
+await movieRepository.save(movie);
+
+
+////////////////////
+
+// Update
+
+// Option 1 - Force ID
+const movies=movieRespository.find()
+
+const updatedMovie=movieRepositry.update(movies, {
+    title: "New value"
+})
+
+// Option 2 - Force ID
+const movies=movieRespository.find()
+
+movies.title="New Value"
+
+const updatedMovie=movieRepository.save(movies)
+
+// Option 3 - Another use case - Need to be done
+
+await movieRepository.update(where: {}, values: {});
+
+await movieRepository.find(where: {}).update({dsadsa: dsa})
+
+
+
+
+
+////////////////////////////////////
+
+
+// 1 - Eager relationship
+// We can start with a single layer
+
+OGMRelationship(() => PersonSchema, "ACTED_IN", "IN", {eager: true})
+
+
+
+// 2- Query with explicit relationships
+const result = await movieRespository.find({where: {}, relationships: {
+    actors: true,
+    director: {
+        movies: true
+    }
+}})
+
+await movieRespository.find({where: {}, relationships: {
+        actors: {where: {name: "Keanu"}},
+        directors: {relationship: {movies: true}}
+}})
+
+
+// 3- Query path - rejected
+
+const moviepath = OGM.path(movie)
+moviepath.actors().where({name:Keanu})
+moviepath.directors().directed()
+
+
+const moviepath = {
+    relationships: {
+        actors: {
+            where: {
+                name: "Keanu"
+            }
+        },
+        directors: {
+            relationships: {
+                directed: true
+            }
+        }
+    }
+}
+
+
+// 4 - Lazy relationships
+
+
+{
+    title: "Movie",
+    actor: [{
+        relatedMovie: [{
+
+        }]
+    }]
+}
+
+
+// Option for single relationships
+
+const moviesWithRelationsips= movieRepository.find({}, [
+    "directors",
+    "actors"
+])
+
+
+const movie={
+    title: "The Matrix",
+    actors: Relationship<Actor>
+}
+
+movie.actors.get(); // IF it was included, returns, if not, query DB
+
+
+//////////
+
+const movies = movieRepository.find({}) // LazyList<Movie>
+
+movies.forEach((movie)=>{
+})
+
+for(const movie of movies){
+    // Actual movie object
+}
+
+
+movie.withRelationship(actors)
+
+
+
+//////////////////////////7
+
+```
