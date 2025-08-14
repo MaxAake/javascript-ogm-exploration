@@ -45,4 +45,11 @@ const updatedMovie = await movieRepository.update(
 
 console.log(updatedMovie);
 
+await movieRepository.delete({
+    title: "The Fountain",
+});
+
 driver.close();
+
+// TODO:
+// update with DAOs using ID

@@ -82,6 +82,25 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         return results;
     }
 
+    public async delete(where: Record<string, any>): Promise<void> {
+        const node = new Cypher.Node();
+
+        const parsedPredicates = this.getPredicates(where);
+
+        const query = new Cypher.Match(
+            new Cypher.Pattern(node, {
+                labels: [this.label],
+            })
+        )
+            .where(node, parsedPredicates)
+            .delete(node);
+
+        console.log(query);
+        const { cypher, params } = query.build();
+
+        await this.ogm.runCypher<T>(cypher, params, this.rules);
+    }
+
     private getProjection(node: Cypher.Node): Array<[Cypher.Expr, string]> {
         return Object.keys(this.schema).map((key) => {
             return [node.property(key), key];
