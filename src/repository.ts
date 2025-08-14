@@ -18,7 +18,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
     }
 
     public async find(where: Record<string, any>): Promise<T[]> {
-        const movieNode = new Cypher.Node();
+        const node = new Cypher.Node();
 
         const parsedPredicates = Object.entries(where).reduce((acc, [key, value]) => {
             if (this.rules[key]?.validate !== undefined) {
@@ -29,15 +29,15 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         }, {} as Record<string, Cypher.Param>);
 
         const projection: Array<[Cypher.Expr, string]> = Object.keys(this.schema).map((key) => {
-            return [movieNode.property(key), key];
+            return [node.property(key), key];
         });
 
         const query = new Cypher.Match(
-            new Cypher.Pattern(movieNode, {
+            new Cypher.Pattern(node, {
                 labels: [this.label],
             })
         )
-            .where(movieNode, parsedPredicates)
+            .where(node, parsedPredicates)
             .return(...projection);
 
         console.log(query);
@@ -48,18 +48,25 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         return results;
     }
 
-    public async create(data: T): Promise<void> {
+    public async create(data: T): Promise<T> {
         const node = new Cypher.Node();
 
         const inputParams: Array<[Cypher.Property, Cypher.Param]> = Object.entries(data).map(([key, value]) => {
             return [node.property(key), new Cypher.Param(value)];
         });
 
-        const query = new Cypher.Create(new Cypher.Pattern(node, { labels: [this.label] })).set(...inputParams);
+        const projection: Array<[Cypher.Expr, string]> = Object.keys(this.schema).map((key) => {
+            return [node.property(key), key];
+        });
+
+        const query = new Cypher.Create(new Cypher.Pattern(node, { labels: [this.label] }))
+            .set(...inputParams)
+            .return(...projection);
         console.log(query);
         const { cypher, params } = query.build();
 
-        await this.ogm.runCypher(cypher, params, this.rules);
+        const result = await this.ogm.runCypher<T>(cypher, params, this.rules);
+        return result[0]!;
     }
 }
 

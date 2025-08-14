@@ -27,9 +27,11 @@ const movies = await movieRepository.find({
 
 console.log(movies);
 
-await movieRepository.create({
+const movie = await movieRepository.create({
     title: "The Fountain",
     released: 1999,
 });
+
+console.log(movie);
 
 driver.close();
