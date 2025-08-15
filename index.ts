@@ -10,7 +10,8 @@ const PersonSchema = {
 const MovieSchema = {
     title: OGMString,
     released: OGMNumber,
-    actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN"),
+    actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN", {eager: true}),
+    directors: OGMRelationship(() => PersonSchema, "DIRECTED", "IN")
 };
 
 const driver = neo4j.driver("neo4j://localhost:7687", neo4j.auth.basic("neo4j", "password"), {
@@ -26,6 +27,7 @@ const movies = await movieRepository.find({
 });
 
 console.log(movies);
+console.log(movies[0]?.actors[0].getRelationshipProperties());
 
 const movie = await movieRepository.create({
     title: "The Fountain",
