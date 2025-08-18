@@ -1,11 +1,10 @@
 TODO:
 
--   Return items on create <- Andres
--   Update operation with where and values <- Andres
--   If possible, update using ID over DAOs <- Andres
+-   If possible, update using ID over DAOs <- AngryKoala
+-   Add OGMId to OGMSchemas <- AngryKoala
+-   Support passing a list of results to a find, allows subsquent getting of relationships
+-   Wrap returned relationships into a class, with get() to query for lazy relationships.
 
--   Eager relationship (1-level) <- Max **DONE**
--   Relationships in find (with where if possible) <- Max
 
 ```ts
 import { driver, Relationship } from "neo4j-driver"
@@ -308,6 +307,15 @@ movie.withRelationship(actors)
 
 
 
-//////////////////////////7
+/////////////////////////
 
+//Looking at lazy relationships
+const users = userRepository.find({where: {something: true}})
+const filteredUsers = users.filter((usr) => user.name === "gary")
+
+const usersWithFriendsOfFriends = userRepository.find(filteredUsers, {friends: {friends: true}}) //runs one single query to get relationships
+//Making users (the return value of .find()) a class we control, rather than just a list of objects, would let us add functions.
+
+//Wrap relationship lists of returned objects in a class
+filteredUsers[0].friends.get() // would get the friends of the first user in the result. Runs a query the first time get is run (if relationship is lazy)
 ```
