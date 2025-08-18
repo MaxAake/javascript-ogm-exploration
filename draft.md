@@ -4,7 +4,7 @@ TODO:
 -   Update operation with where and values <- Andres
 -   If possible, update using ID over DAOs <- Andres
 
--   Eager relationship (1-level) <- Max
+-   Eager relationship (1-level) <- Max **DONE**
 -   Relationships in find (with where if possible) <- Max
 
 ```ts
