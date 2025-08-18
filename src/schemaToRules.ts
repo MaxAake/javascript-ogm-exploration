@@ -17,11 +17,15 @@ export function schemaToRules(schema: OGMSchema): Rules {
         else if (value instanceof RelationshipAnnotation) {
             if(value.eager) {
                 rules[key] = rule.asList({apply: {convert: (val) => {
+                        if(Object.entries(val).filter(([_, value]) => value !== null).length === 0) {
+                            return undefined
+                        }
                         let obj: any = as(objToGettable(val), schemaToRules(value.targetNodeSchema))
                         obj.getRelationshipProperties = () => val.relationshipProperties
                         return obj
-                    }
-                }})
+                    }},
+                doNotPushUndefined: true
+                })
             }
         }
     }

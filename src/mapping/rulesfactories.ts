@@ -346,7 +346,7 @@ export const rule = Object.freeze({
    * @param {Rule & { apply?: Rule }} rule Configurations for the rule
    * @returns {Rule} A new rule for the value
    */
-  asList (rule?: Rule & { apply?: Rule }): Rule {
+  asList (rule?: Rule & { apply?: Rule, doNotPushUndefined?: boolean }): Rule {
     return {
       validate: (value: any, field: string) => {
         if (!Array.isArray(value)) {
@@ -355,7 +355,11 @@ export const rule = Object.freeze({
       },
       convert: (list: any[], field: string) => {
         if (rule?.apply != null) {
-          return list.map((value, index) => valueAs(value, `${field}[${index}]`, rule.apply))
+          const newList = list.map((value, index) => valueAs(value, `${field}[${index}]`, rule.apply))
+          if(rule?.doNotPushUndefined === true) {
+            return newList.filter((value) => value !== undefined)
+          }
+          return newList
         }
         return list
       },
