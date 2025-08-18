@@ -9,21 +9,21 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
     private schema: OGMSchema;
     private ogm: OGM;
     private label: string;
-    private rules: Rules;
 
     constructor(ogm: OGM, label: string, schema: OGMSchema) {
         this.schema = schema;
         this.ogm = ogm;
         this.label = label;
-        this.rules = schemaToRules(schema);
     }
 
-    public async find(where: Record<string, any>): Promise<T[]> {
+    public async find(where: Record<string, any>, relationships?: object): Promise<T[]> {
         const node = new Cypher.Node();
 
-        const parsedPredicates = this.getPredicates(where);
+        const schema: OGMSchema = relationships !== undefined ? buildSchema(this.schema, relationships) : this.schema
+        
+        const parsedPredicates = this.getPredicates(where, schemaToRules(this.schema));
 
-        const projection = this.getProjection(node);
+        const projection = this.getProjection(node, schema);
 
         const query = new Cypher.Match(
             new Cypher.Pattern(node, {
@@ -32,14 +32,14 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         )
             .where(node, parsedPredicates)
 
-        const queryWithRelationships = this.addRelationshipsToQueryAndProjection(node, query, projection)
+        const queryWithRelationships = this.addRelationshipsToQueryAndProjection(node, query, projection, schema)
         
         queryWithRelationships.return(...projection);
 
         console.log(queryWithRelationships);
         const { cypher, params } = query.build();
 
-        const results =  this.addLazyRelationships(await this.ogm.runCypher<T>(cypher, params, this.rules));
+        const results =  this.addLazyRelationships(await this.ogm.runCypher<T>(cypher, params, schemaToRules(schema)));
         return results;
     }
 
@@ -48,7 +48,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
 
         const inputParams = this.getInputParams(node, data);
 
-        const projection = this.addEmptyRelationships(this.getProjection(node));
+        const projection = this.addEmptyRelationships(this.getProjection(node, this.schema));
 
         const query = new Cypher.Create(new Cypher.Pattern(node, { labels: [this.label] }))
             .set(...inputParams)
@@ -56,17 +56,17 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         console.log(query);
         const { cypher, params } = query.build();
 
-        const result = await this.ogm.runCypher<T>(cypher, params, this.rules);
+        const result = await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
         return result[0]!;
     }
 
     public async update(where: Record<string, any>, values: Partial<T>): Promise<T[]> {
         const node = new Cypher.Node();
 
-        const parsedPredicates = this.getPredicates(where);
+        const parsedPredicates = this.getPredicates(where, schemaToRules(this.schema));
         const inputParams = this.getInputParams(node, values);
 
-        const projection = this.getProjection(node);
+        const projection = this.getProjection(node, this.schema);
 
         const query = new Cypher.Match(
             new Cypher.Pattern(node, {
@@ -75,7 +75,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         )
             .where(node, parsedPredicates)
 
-        const queryWithRelationships = this.addRelationshipsToQueryAndProjection(node, query, projection)
+        const queryWithRelationships = this.addRelationshipsToQueryAndProjection(node, query, projection, this.schema)
 
         queryWithRelationships.set(...inputParams)
         queryWithRelationships.return(...projection);
@@ -83,7 +83,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         console.log(queryWithRelationships);
         const { cypher, params } = query.build();
 
-        const results = await this.ogm.runCypher<T>(cypher, params, this.rules);
+        const results = await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
 
         return results;
     }
@@ -91,7 +91,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
     public async delete(where: Record<string, any>): Promise<void> {
         const node = new Cypher.Node();
 
-        const parsedPredicates = this.getPredicates(where);
+        const parsedPredicates = this.getPredicates(where, schemaToRules(this.schema));
 
         const query = new Cypher.Match(
             new Cypher.Pattern(node, {
@@ -104,18 +104,18 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         console.log(query);
         const { cypher, params } = query.build();
 
-        await this.ogm.runCypher<T>(cypher, params, this.rules);
+        await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
     }
 
-    private getProjection(node: Cypher.Node): Array<[Cypher.Expr, string]> {
-        return Object.keys(this.schema).filter(value => !(this.schema[value] instanceof RelationshipAnnotation)).map((key) => {
+    private getProjection(node: Cypher.Node, schema: OGMSchema): Array<[Cypher.Expr, string]> {
+        return Object.keys(schema).filter(value => !(schema[value] instanceof RelationshipAnnotation)).map((key) => {
             return [node.property(key), key];
         });
     }
 
-    private addRelationshipsToQueryAndProjection(node: Cypher.Node, query: Cypher.Match, projection: Array<[Cypher.Expr, string]>) {
+    private addRelationshipsToQueryAndProjection(node: Cypher.Node, query: Cypher.Match, projection: Array<[Cypher.Expr, string]>, schema: OGMSchema) {
         let lastQuery = query
-        for (const [key, value] of Object.entries(this.schema).filter((val) => {
+        for (const [key, value] of Object.entries(schema).filter((val) => {
             if (val[1] instanceof RelationshipAnnotation && val[1].eager === true) {
                 return true
             }
@@ -124,28 +124,28 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
             const relationshipSchema = value as RelationshipAnnotation
             const relNode = new Cypher.Node()
             const rel = new Cypher.Relationship()
-            lastQuery = lastQuery.optionalMatch(new Cypher.Pattern(node)
+            const relname = new Cypher.NamedVariable(key);
+
+            let subquery = new Cypher.Match(new Cypher.Pattern(node)
                 .related(rel, { type: relationshipSchema.label, direction: relationshipSchema.direction == "IN" ? "left" : "right" })
                 .to(relNode))
-            const relationshipProjection = this.getRelationshipProjection(relNode, relationshipSchema.targetNodeSchema)
-            relationshipProjection.relationshipProperties = Cypher.properties(rel)
-            projection.push([Cypher.collect(new Cypher.Map(relationshipProjection)), key])
+
+            const relationshipProjection = this.getProjection(relNode, relationshipSchema.targetNodeSchema)
+            relationshipProjection.push([Cypher.properties(rel), "relationshipProperties"])
+            subquery = this.addRelationshipsToQueryAndProjection(relNode, subquery, relationshipProjection, relationshipSchema.targetNodeSchema)
+            const relationshipProjectionRecord:Record<string, Cypher.Expr> = {}
+            relationshipProjection.forEach(([value, key]) => relationshipProjectionRecord[key] = value)
+            projection.push([relname, key])
+            subquery.return(new Cypher.Return([Cypher.collect(new Cypher.Map(relationshipProjectionRecord)), key]))
+            lastQuery = lastQuery.call(subquery)
         }
         return lastQuery
     }
 
-    private getRelationshipProjection(node: Cypher.Node, schema: OGMSchema): Record<string, Cypher.Expr> {
-        const record: Record<string, Cypher.Expr> = {}
-        Object.keys(schema).filter(value => !(schema[value] instanceof RelationshipAnnotation)).forEach((key) => {
-            record[key] = node.property(key);
-        });
-        return record
-    }
-
-    private getPredicates(where: Record<string, any>): Record<string, Cypher.Param> {
+    private getPredicates(where: Record<string, any>, rules: Rules): Record<string, Cypher.Param> {
         return Object.entries(where).reduce((acc, [key, value]) => {
-            if (this.rules[key]?.validate !== undefined) {
-                this.rules[key].validate(value, key);
+            if (rules[key]?.validate !== undefined) {
+                rules[key].validate(value, key);
             }
             acc[key] = new Cypher.Param(value);
             return acc;
@@ -173,4 +173,17 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         });
         return results
     }
+}
+
+function buildSchema(schema: OGMSchema, relationships: object): OGMSchema {
+    for(const [key, value] of Object.entries(relationships)) {
+        if (value instanceof Object) {
+            (schema[key] as RelationshipAnnotation).targetNodeSchema = buildSchema((schema[key] as RelationshipAnnotation).targetNodeSchema, value);
+            (schema[key] as RelationshipAnnotation).eager = true;
+        }
+        else if (value === true) {
+            (schema[key] as RelationshipAnnotation).eager = true;
+        }
+    }
+    return schema
 }

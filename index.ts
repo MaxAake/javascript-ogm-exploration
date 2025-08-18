@@ -1,16 +1,17 @@
 import * as neo4j from "neo4j-driver";
-import { OGM } from "./src/ogm.js";
+import { OGM, type OGMSchema } from "./src/ogm.js";
 import { OGMNumber, OGMRelationship, OGMString } from "./src/typeAnnotation.js";
 
-const PersonSchema = {
+const PersonSchema: OGMSchema = {
     name: OGMString,
     born: OGMNumber,
+    roles: OGMRelationship(() => MovieSchema, "ACTED_IN", "OUT")
 };
 
-const MovieSchema = {
+const MovieSchema: OGMSchema = {
     title: OGMString,
     released: OGMNumber,
-    actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN", {eager: true}),
+    actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN"),
     directors: OGMRelationship(() => PersonSchema, "DIRECTED", "IN")
 };
 
@@ -24,7 +25,7 @@ const movieRepository = ogm.registerNode("Movie", MovieSchema);
 
 const movies = await movieRepository.find({
     title: "The Matrix",
-});
+}, {actors: {roles: true}});
 
 console.log(movies);
 console.log(movies[0]?.actors[0].getRelationshipProperties());
