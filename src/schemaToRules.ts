@@ -1,7 +1,7 @@
 import { type Rules, as } from "./mapping/mapping.js";
 import { rule } from "./mapping/rulesfactories.js";
 import type { OGMSchema } from "./ogm.js";
-import { OGMNumber, OGMString, RelationshipAnnotation } from "./typeAnnotation.js";
+import { OGMId, OGMNumber, OGMString, RelationshipAnnotation } from "./typeAnnotation.js";
 
 interface Gettable { get: <V>(key: string) => V }
 
@@ -11,7 +11,7 @@ export function schemaToRules(schema: OGMSchema): Rules {
     for (const [key, value] of Object.entries(schema)) {
         if (value === OGMNumber) {
             rules[key] = rule.asNumber();
-        } else if (value === OGMString) {
+        } else if (value === OGMString || value === OGMId) {
             rules[key] = rule.asString();
         }
         else if (value instanceof RelationshipAnnotation) {

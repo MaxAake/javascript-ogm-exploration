@@ -39,6 +39,7 @@ console.log(movies);
 console.log(movies[0]?.actors[0].getRelationshipProperties());
 
 const movie = await movieRepository.create({
+    id: "onetwo",
     title: "The Fountain",
     released: 1999,
 });
