@@ -4,6 +4,19 @@ import { OGMId, OGMNumber, OGMRelationship, OGMString } from "./src/typeAnnotati
 
 let MovieSchema: OGMSchema = {};
 
+/*
+
+Cypher setup
+
+
+CREATE(m:Movie {id: "1", title: "The Matrix", released: 1999})
+CREATE(p:Person {id:"2", name: "Keanu", born: 1900})
+CREATE(d:Person {id: "3", name: "Unpronounceable name", born: 1800 })
+
+CREATE(m)<-[:ACTED_IN { role: "neo"}]-(p)
+CREATE(m)<-[:DIRECTED]-(d)
+
+*/
 const PersonSchema: OGMSchema = {
     id: OGMId,
     name: OGMString,
@@ -16,7 +29,7 @@ MovieSchema = {
     title: OGMString,
     released: OGMNumber,
     actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN"),
-    directors: OGMRelationship(() => PersonSchema, "DIRECTED", "IN"),
+    directors: OGMRelationship(() => PersonSchema, "DIRECTED", "IN", { eager: true }),
 };
 
 const driver = neo4j.driver("neo4j://localhost:7687", neo4j.auth.basic("neo4j", "password"), {
@@ -65,3 +78,4 @@ driver.close();
 
 // TODO:
 // update with DAOs using ID
+// Lazy relationships

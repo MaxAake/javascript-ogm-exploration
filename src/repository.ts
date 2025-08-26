@@ -31,9 +31,9 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
             })
         ).where(node, parsedPredicates);
 
-        const queryWithRelationships = this.addRelationshipsToQueryAndProjection(node, query, projection, schema);
+        const subqueries = this.addRelationshipsToQueryAndProjection(node, projection, schema);
 
-        queryWithRelationships.return(...projection);
+        const queryWithRelationships = Cypher.utils.concat(query, ...subqueries, new Cypher.Return(...projection));
 
         console.log(queryWithRelationships);
         const { cypher, params } = query.build();
@@ -67,19 +67,20 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
 
         const projection = this.getProjection(node, this.schema);
 
-        const query = new Cypher.Match(
+        const match = new Cypher.Match(
             new Cypher.Pattern(node, {
                 labels: [this.label],
             })
         ).where(node, parsedPredicates);
 
-        const queryWithRelationships = this.addRelationshipsToQueryAndProjection(node, query, projection, this.schema);
+        const subqueries = this.addRelationshipsToQueryAndProjection(node, projection, this.schema);
 
-        queryWithRelationships.set(...inputParams);
-        queryWithRelationships.return(...projection);
+        match.set(...inputParams);
+
+        const queryWithRelationships = Cypher.utils.concat(match, ...subqueries, new Cypher.Return(...projection));
 
         console.log(queryWithRelationships);
-        const { cypher, params } = query.build();
+        const { cypher, params } = queryWithRelationships.build();
 
         const results = await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
 
@@ -115,11 +116,10 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
 
     private addRelationshipsToQueryAndProjection(
         node: Cypher.Node,
-        query: Cypher.Match,
         projection: Array<[Cypher.Expr, string]>,
         schema: OGMSchema
-    ) {
-        let lastQuery = query;
+    ): Cypher.Call[] {
+        const subqueries: Cypher.Call[] = [];
         for (const [key, value] of Object.entries(schema).filter((val) => {
             if (val[1] instanceof RelationshipAnnotation && val[1].eager === true) {
                 return true;
@@ -131,7 +131,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
             const rel = new Cypher.Relationship();
             const relname = new Cypher.NamedVariable(key);
 
-            let subquery = new Cypher.Match(
+            const match = new Cypher.Match(
                 new Cypher.Pattern(node)
                     .related(rel, {
                         type: relationshipSchema.label,
@@ -142,20 +142,42 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
 
             const relationshipProjection = this.getProjection(relNode, relationshipSchema.targetNodeSchema);
             relationshipProjection.push([Cypher.properties(rel), "relationshipProperties"]);
-            subquery = this.addRelationshipsToQueryAndProjection(
+            const nestedSubqueries = this.addRelationshipsToQueryAndProjection(
                 relNode,
-                subquery,
                 relationshipProjection,
                 relationshipSchema.targetNodeSchema
             );
             const relationshipProjectionRecord: Record<string, Cypher.Expr> = {};
             relationshipProjection.forEach(([value, key]) => (relationshipProjectionRecord[key] = value));
             projection.push([relname, key]);
-            subquery.return(new Cypher.Return([Cypher.collect(new Cypher.Map(relationshipProjectionRecord)), key]));
-            lastQuery = lastQuery.call(subquery);
+            // lastQuery = lastQuery.call(subquery);
+
+            subqueries.push(
+                new Cypher.Call(
+                    Cypher.utils.concat(
+                        match,
+                        ...nestedSubqueries,
+                        new Cypher.Return([Cypher.collect(new Cypher.Map(relationshipProjectionRecord)), key])
+                    )
+                )
+            );
         }
-        return lastQuery;
+        return subqueries;
     }
+
+    // <Clause Call> """
+    //     MATCH (this0:Movie)
+    //     WHERE this0.title = $param0
+    //     CALL {
+    //         MATCH (this0)<-[this1:ACTED_IN]-(this2)
+    //         CALL {
+    //             MATCH (this2)-[this3:ACTED_IN]->(this4)
+    //             RETURN collect({ relationshipProperties: properties(this3) }) AS roles
+    //         }
+    //         RETURN collect({ id: this2.id, name: this2.name, born: this2.born, relationshipProperties: properties(this1), roles: roles }) AS actors
+    //     }
+    //     RETURN this0.id AS id, this0.title AS title, this0.released AS released, actors AS actors
+    // """
 
     private getPredicates(where: Record<string, any>, rules: Rules): Record<string, Cypher.Param> {
         return Object.entries(where).reduce((acc, [key, value]) => {
