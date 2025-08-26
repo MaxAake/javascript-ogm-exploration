@@ -3,7 +3,9 @@ import { rule } from "./mapping/rulesfactories.js";
 import type { OGMSchema } from "./ogm.js";
 import { OGMId, OGMNumber, OGMString, RelationshipAnnotation } from "./typeAnnotation.js";
 
-interface Gettable { get: <V>(key: string) => V }
+interface Gettable {
+    get: <V>(key: string) => V;
+}
 
 export function schemaToRules(schema: OGMSchema): Rules {
     const rules: OGMSchema = {};
@@ -13,29 +15,29 @@ export function schemaToRules(schema: OGMSchema): Rules {
             rules[key] = rule.asNumber();
         } else if (value === OGMString || value === OGMId) {
             rules[key] = rule.asString();
-        }
-        else if (value instanceof RelationshipAnnotation) {
-            if(value.eager) {
-                rules[key] = rule.asList({apply: {convert: (val) => {
-                        if(Object.entries(val).filter(([_, value]) => value !== null).length === 0) {
-                            return undefined
-                        }
-                        let obj: any = as(objToGettable(val), schemaToRules(value.targetNodeSchema))
-                        obj.getRelationshipProperties = () => val.relationshipProperties
-                        return obj
-                    }},
-                doNotPushUndefined: true
-                })
+        } else if (value instanceof RelationshipAnnotation) {
+            if (value.eager) {
+                rules[key] = rule.asList({
+                    apply: {
+                        convert: (val) => {
+                            if (Object.entries(val).filter(([_, value]) => value !== null).length === 0) {
+                                return undefined;
+                            }
+                            let obj: any = as(objToGettable(val), schemaToRules(value.targetNodeSchema));
+                            obj.getRelationshipProperties = () => val.relationshipProperties;
+                            return obj;
+                        },
+                    },
+                    doNotPushUndefined: true,
+                });
             }
         }
     }
     return rules;
 }
 
-
-
 function objToGettable(obj: Record<string, any>): Gettable {
-    const gettable = obj
-    gettable.get = (key: string) => obj[key]
-    return gettable as Gettable
+    const gettable = obj;
+    gettable.get = (key: string) => obj[key];
+    return gettable as Gettable;
 }
