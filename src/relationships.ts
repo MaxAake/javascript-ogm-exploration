@@ -1,7 +1,7 @@
 import type { OGMSchema } from "./ogm.js";
 import type { Direction } from "./typeAnnotation.js";
 
-export class PlaceholderRelationships {
+export class LazyRelationship {
     label: string;
     direction: Direction;
     targetNodeSchema: OGMSchema;

@@ -1,6 +1,10 @@
 import type { OGMSchema } from "./ogm.js";
 
-export abstract class SchemaAnnotation {}
+export abstract class SchemaAnnotation {
+    public clone() {
+        return new (this.constructor as any)();
+    }
+}
 
 export class NumberAnnotation extends SchemaAnnotation {}
 
@@ -26,6 +30,12 @@ export class RelationshipAnnotation extends SchemaAnnotation {
         } else {
             this.eager = config.eager;
         }
+    }
+
+    public clone() {
+        return new RelationshipAnnotation(this.targetNodeSchema, this.label, this.direction, {
+            eager: this.eager,
+        });
     }
 }
 

@@ -70,6 +70,16 @@ const updatedMovie = await movieRepository.update(
 
 console.log(updatedMovie);
 
+/// Lazy relationships
+
+const moviesWithoutRelationships = await movieRepository.find({
+    title: "The Matrix",
+});
+
+console.log("LAZY RELATIONSHIPS");
+console.log(moviesWithoutRelationships);
+console.log(moviesWithoutRelationships[0]?.actors);
+
 await movieRepository.delete({
     title: "The Fountain",
 });

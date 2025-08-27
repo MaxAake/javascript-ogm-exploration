@@ -1,7 +1,7 @@
 import * as Cypher from "@neo4j/cypher-builder";
 import type { Rules } from "./mapping/mapping.js";
 import type { OGM, OGMSchema } from "./ogm.js";
-import { PlaceholderRelationships } from "./relationships.js";
+import { LazyRelationship } from "./relationships.js";
 import { schemaToRules } from "./schemaToRules.js";
 import { RelationshipAnnotation } from "./typeAnnotation.js";
 
@@ -16,12 +16,15 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         this.label = label;
     }
 
-    public async find(where: Record<string, any>, relationships?: object): Promise<T[]> {
+    public async find(
+        where: Record<string, any>,
+        relationships?: Record<string, boolean | Record<string, any>>
+    ): Promise<T[]> {
         const node = new Cypher.Node();
 
+        // NOTE: There is a bug with this approach, as schema is modified
         const schema: OGMSchema = relationships !== undefined ? buildSchema(this.schema, relationships) : this.schema;
-
-        const parsedPredicates = this.getPredicates(where, schemaToRules(this.schema));
+        const parsedPredicates = this.getPredicates(where, schemaToRules(schema));
 
         const projection = this.getProjection(node, schema);
 
@@ -38,7 +41,10 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         console.log(queryWithRelationships);
         const { cypher, params } = query.build();
 
-        const results = this.addLazyRelationships(await this.ogm.runCypher<T>(cypher, params, schemaToRules(schema)));
+        const results = this.addLazyRelationships(
+            await this.ogm.runCypher<T>(cypher, params, schemaToRules(schema)),
+            schema
+        );
         return results;
     }
 
@@ -204,34 +210,37 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         return predicate.concat(relationships);
     }
 
-    private addLazyRelationships(results: any[]) {
-        Object.entries(this.schema).forEach(([key, value]) => {
+    private addLazyRelationships(results: any[], schema: OGMSchema) {
+        Object.entries(schema).forEach(([key, value]) => {
             if (value instanceof RelationshipAnnotation && value.eager === false) {
-                results.forEach(
-                    (result) =>
-                        (result[key] = new PlaceholderRelationships(
-                            value.label,
-                            value.direction,
-                            value.targetNodeSchema
-                        ))
-                );
+                results.forEach((result) => {
+                    result[key] = new LazyRelationship(value.label, value.direction, value.targetNodeSchema);
+                });
             }
         });
         return results;
     }
 }
 
-function buildSchema(schema: OGMSchema, relationships: object): OGMSchema {
+function buildSchema(schema: OGMSchema, relationships: Record<string, boolean | Record<string, any>>): OGMSchema {
+    const newSchema = cloneSchema(schema);
     for (const [key, value] of Object.entries(relationships)) {
         if (value instanceof Object) {
-            (schema[key] as RelationshipAnnotation).targetNodeSchema = buildSchema(
-                (schema[key] as RelationshipAnnotation).targetNodeSchema,
+            (newSchema[key] as RelationshipAnnotation).targetNodeSchema = buildSchema(
+                (newSchema[key] as RelationshipAnnotation).targetNodeSchema,
                 value
             );
-            (schema[key] as RelationshipAnnotation).eager = true;
+            (newSchema[key] as RelationshipAnnotation).eager = true;
         } else if (value === true) {
-            (schema[key] as RelationshipAnnotation).eager = true;
+            (newSchema[key] as RelationshipAnnotation).eager = true;
         }
     }
-    return schema;
+    return newSchema;
+}
+
+function cloneSchema(schema: OGMSchema): OGMSchema {
+    return Object.entries(schema).reduce<OGMSchema>((acc, [key, value]) => {
+        acc[key] = value.clone();
+        return acc;
+    }, {});
 }
