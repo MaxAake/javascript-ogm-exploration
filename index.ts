@@ -30,13 +30,20 @@ MovieSchema = {
     directors: OGMRelationship(() => PersonSchema, "DIRECTED", "IN", { eager: true }),
 };
 
+type Movie = {
+    title: string,
+    released: number,
+    actors: any[]
+    directors: any[]
+}
+
 const driver = neo4j.driver("neo4j://localhost:7687", neo4j.auth.basic("neo4j", "password"), {
     disableLosslessIntegers: true,
 });
 
 const ogm = new OGM(driver);
 
-const movieRepository = ogm.registerNode("Movie", MovieSchema);
+const movieRepository = ogm.registerNode<Movie>("Movie", MovieSchema)
 ogm.registerNode("Person", PersonSchema);
 
 const movies = await movieRepository.find(
@@ -73,8 +80,8 @@ const moviesWithoutRelationships = await movieRepository.find({
 });
 
 console.log("LAZY RELATIONSHIPS");
-console.log(moviesWithoutRelationships);
-console.log(moviesWithoutRelationships[0]?.actors);
+console.log(moviesWithoutRelationships.records);
+console.log(moviesWithoutRelationships.records[0]?.actors);
 
 await movieRepository.delete({
     title: "The Fountain",

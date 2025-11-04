@@ -1,5 +1,5 @@
 import neo4j, { ResultSummary } from "neo4j-driver";
-import type { EagerResult, Rules } from "neo4j-driver"
+import type { EagerResult, MappedQueryResult, QueryResult, Rules } from "neo4j-driver"
 import { NodeRepository } from "./repository.js";
 import { IdAnnotation, type SchemaAnnotation } from "./typeAnnotation.js";
 
@@ -12,18 +12,18 @@ export class OGM {
         this.driver = driver;
     }
 
-    public registerNode(label: string, schema: OGMSchema): NodeRepository {
+    public registerNode<T extends Record<string, any> = any>(label: string, schema: OGMSchema): NodeRepository<T> {
         this.validateSchema(label, schema);
         return new NodeRepository(this, label, schema);
     }
 
     // Max add resultsMapper here
-    public async runCypher<T extends Record<string, any>>(
+    public async runCypher<T extends MappedQueryResult<any>>(
         cypher: string,
         params: Record<string, any> = {},
         rules: Rules
-    ): Promise<T[]> {
-        return this.driver.executeQuery<T[]>(cypher, params, {
+    ): Promise<T> {
+        return this.driver.executeQuery<T>(cypher, params, {
             // @ts-ignore
             resultTransformer: neo4j.resultTransformers.hydrated<T[]>(rules),
         });

@@ -1,5 +1,5 @@
 import * as Cypher from "@neo4j/cypher-builder";
-import type { QueryResult, Result, Rules } from "neo4j-driver";
+import type { MappedQueryResult, QueryResult, RecordShape, Rules } from "neo4j-driver";
 import type { OGM, OGMSchema } from "./ogm.js";
 import { LazyRelationship } from "./relationships.js";
 import { schemaToRules } from "./schemaToRules.js";
@@ -19,7 +19,7 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
     public async find(
         where: Record<string, any>,
         relationships?: Record<string, boolean | Record<string, any>>
-    ): Promise<T[]> {
+    ): Promise<MappedQueryResult<T>> {
         const node = new Cypher.Node();
 
         // NOTE: There is a bug with this approach, as schema is modified
@@ -38,17 +38,16 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
 
         const queryWithRelationships = Cypher.utils.concat(query, ...subqueries, new Cypher.Return(...projection));
 
-        console.log(queryWithRelationships);
-        const { cypher, params } = query.build();
+        const { cypher, params } = queryWithRelationships.build();
 
         const results = this.addLazyRelationships(
-            await this.ogm.runCypher<T>(cypher, params, schemaToRules(schema)),
+            await this.ogm.runCypher<MappedQueryResult<T>>(cypher, params, schemaToRules(schema)),
             schema
         );
         return results;
     }
 
-    public async create(data: T): Promise<T> {
+    public async create(data: Partial<T>): Promise<RecordShape | undefined> {
         const node = new Cypher.Node();
 
         const inputParams = this.getInputParams(node, data);
@@ -58,14 +57,14 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         const query = new Cypher.Create(new Cypher.Pattern(node, { labels: [this.label] }))
             .set(...inputParams)
             .return(...projection);
-        console.log(query);
+
         const { cypher, params } = query.build();
 
-        const result = await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
-        return result[0]!;
+        const result = await this.ogm.runCypher<MappedQueryResult<T>>(cypher, params, schemaToRules(this.schema));
+        return result.records[0];
     }
 
-    public async update(where: Record<string, any>, values: Partial<T>): Promise<T[]> {
+    public async update(where: Record<string, any>, values: Partial<T>): Promise<MappedQueryResult<T>> {
         const node = new Cypher.Node();
 
         const parsedPredicates = this.getPredicates(where, schemaToRules(this.schema));
@@ -87,10 +86,9 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
 
         const queryWithRelationships = Cypher.utils.concat(match, ...subqueries, new Cypher.Return(...projection));
 
-        console.log(queryWithRelationships);
         const { cypher, params } = queryWithRelationships.build();
 
-        const results = await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
+        const results = await this.ogm.runCypher<MappedQueryResult<T>>(cypher, params, schemaToRules(this.schema));
 
         return results;
     }
@@ -108,10 +106,9 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
             .where(node, parsedPredicates)
             .delete(node);
 
-        console.log(query);
         const { cypher, params } = query.build();
 
-        await this.ogm.runCypher<T>(cypher, params, schemaToRules(this.schema));
+        await this.ogm.runCypher<MappedQueryResult<T>>(cypher, params, schemaToRules(this.schema));
     }
 
     private getProjection(node: Cypher.Node, schema: OGMSchema): Array<[Cypher.Expr, string]> {
@@ -212,10 +209,9 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         return predicate.concat(relationships);
     }
 
-    private addLazyRelationships(results: QueryResult, schema: OGMSchema) {
+    private addLazyRelationships(results: MappedQueryResult<T>, schema: OGMSchema): MappedQueryResult<T> {
         Object.entries(schema).forEach(([key, value]) => {
             if (value instanceof RelationshipAnnotation && value.eager === false) {
-                console.log(results)
                 results.records.forEach((record) => {
                     // @ts-ignore
                     record[key] = new LazyRelationship(value.label, value.direction, value.targetNodeSchema);
