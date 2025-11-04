@@ -1,6 +1,5 @@
-import * as neo4j from "neo4j-driver";
-import type { Rules } from "./mapping/mapping.js";
-import { hydratedResultTransformer } from "./mapping/resulttransformer.js";
+import neo4j, { ResultSummary } from "neo4j-driver";
+import type { EagerResult, Rules } from "neo4j-driver"
 import { NodeRepository } from "./repository.js";
 import { IdAnnotation, type SchemaAnnotation } from "./typeAnnotation.js";
 
@@ -25,7 +24,8 @@ export class OGM {
         rules: Rules
     ): Promise<T[]> {
         return this.driver.executeQuery<T[]>(cypher, params, {
-            resultTransformer: hydratedResultTransformer<T[]>(rules),
+            // @ts-ignore
+            resultTransformer: neo4j.resultTransformers.hydrated<T[]>(rules),
         });
     }
 

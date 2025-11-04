@@ -18,15 +18,13 @@ CREATE(m)<-[:DIRECTED]-(d)
 
 */
 const PersonSchema: OGMSchema = {
-    id: OGMId,
-    name: OGMString,
+    name: OGMId,
     born: OGMNumber,
     roles: OGMRelationship(() => MovieSchema, "ACTED_IN", "OUT"),
 };
 
 MovieSchema = {
-    id: OGMId,
-    title: OGMString,
+    title: OGMId,
     released: OGMNumber,
     actors: OGMRelationship(() => PersonSchema, "ACTED_IN", "IN"),
     directors: OGMRelationship(() => PersonSchema, "DIRECTED", "IN", { eager: true }),
@@ -49,10 +47,8 @@ const movies = await movieRepository.find(
 );
 
 console.log(movies);
-console.log(movies[0]?.actors[0].getRelationshipProperties());
 
 const movie = await movieRepository.create({
-    id: "onetwo",
     title: "The Fountain",
     released: 1999,
 });

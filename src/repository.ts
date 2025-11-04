@@ -1,5 +1,5 @@
 import * as Cypher from "@neo4j/cypher-builder";
-import type { Rules } from "./mapping/mapping.js";
+import type { QueryResult, Result, Rules } from "neo4j-driver";
 import type { OGM, OGMSchema } from "./ogm.js";
 import { LazyRelationship } from "./relationships.js";
 import { schemaToRules } from "./schemaToRules.js";
@@ -82,6 +82,8 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         const subqueries = this.addRelationshipsToQueryAndProjection(node, projection, this.schema);
 
         match.set(...inputParams);
+
+        match.with("*");
 
         const queryWithRelationships = Cypher.utils.concat(match, ...subqueries, new Cypher.Return(...projection));
 
@@ -210,11 +212,13 @@ export class NodeRepository<T extends Record<string, any> = Record<string, any>>
         return predicate.concat(relationships);
     }
 
-    private addLazyRelationships(results: any[], schema: OGMSchema) {
+    private addLazyRelationships(results: QueryResult, schema: OGMSchema) {
         Object.entries(schema).forEach(([key, value]) => {
             if (value instanceof RelationshipAnnotation && value.eager === false) {
-                results.forEach((result) => {
-                    result[key] = new LazyRelationship(value.label, value.direction, value.targetNodeSchema);
+                console.log(results)
+                results.records.forEach((record) => {
+                    // @ts-ignore
+                    record[key] = new LazyRelationship(value.label, value.direction, value.targetNodeSchema);
                 });
             }
         });
